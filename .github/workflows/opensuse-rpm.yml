@@ -1,0 +1,48 @@
+name: Build openSUSE RPM
+
+on:
+  workflow_dispatch:
+  push:
+    branches: [ "master" ]
+    tags: [ "v*" ]
+
+jobs:
+  build-opensuse-rpm:
+    name: Build RPM package on openSUSE Tumbleweed
+    runs-on: ubuntu-latest
+    container:
+      image: registry.opensuse.org/opensuse/tumbleweed:latest
+    steps:
+      - name: Install Build Dependencies
+        run: |
+          zypper --non-interactive install \
+            git cmake ninja gcc-c++ rpm-build ccache \
+            qt6-base-devel qt6-svg-devel qt6-linguist-devel \
+            kf6-sonnet-devel kf6-kcoreaddons-devel \
+            libtoxcore-devel libsqlcipher-devel libexif-devel \
+            libavcodec-devel libavdevice-devel libavformat-devel libswscale-devel \
+            openal-soft-devel libXScrnSaver-devel libqrencode-devel
+
+      - name: Checkout Source
+        uses: actions/checkout@v4
+        with:
+          submodules: recursive
+
+      - name: Cache ccache
+        uses: actions/cache@v4
+        with:
+          path: ~/.cache/ccache
+          key: ${{ github.job }}-ccache
+
+      - name: Build and Package
+        run: |
+          chmod +x .ci-scripts/package-qtox-opensuse.sh
+          ./.ci-scripts/package-qtox-opensuse.sh --source-dir . --target-dir build_dir
+          # Replace 'path/to/your/emoticons' with the folder in your git repo if not using ./smileys
+          #./.ci-scripts/package-qtox-opensuse.sh --source-dir . --target-dir build_dir --emoticons-dir ./assets/emoticons
+
+      - name: Upload RPM Artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: qTox-openSUSE-RPM
+          path: build_dir/*.rpm
